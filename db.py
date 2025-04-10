@@ -24,7 +24,6 @@ def initialize():
 
     cursor = conn.cursor()
     try:
-        # Create table if it doesn't exist
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_data (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,9 +38,54 @@ def initialize():
                 UNIQUE (guild_id, user_id)
             );
         """)
-        print("Database schema verified.")
+        logging.info("Database schema verified.")
     except Error as e:
-        print(f"Error initializing database: {e}")
+        logging.error(f"Error initializing database: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def add_user(guild_id: int, user_id: int):
+    conn = get_connection()
+    if not conn:
+        logging.info("Unable to connect to database.")
+        return
+
+    cursor = conn.cursor()
+    try:
+        query = """
+        INSERT IGNORE INTO user_data (guild_id, user_id)
+        VALUES (%s, %s)
+        """
+        cursor.execute(query, (guild_id, user_id))
+        conn.commit()
+        logging.info(f"User {user_id} in guild {guild_id} added to user_data.")
+    except Error as e:
+        logging.error(f"Error adding user: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def user_exists(guild_id: int, user_id: int) -> bool:
+    conn = get_connection()
+    if not conn:
+        print("Unable to connect to database.")
+        return False
+
+    cursor = conn.cursor()
+    try:
+        query = """
+        SELECT 1 FROM user_data
+        WHERE guild_id = %s AND user_id = %s
+        LIMIT 1
+        """
+        cursor.execute(query, (guild_id, user_id))
+        result = cursor.fetchone()
+        return result is not None
+    except Error as e:
+        print(f"Error checking if user exists: {e}")
+        return False
     finally:
         cursor.close()
         conn.close()
