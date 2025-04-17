@@ -19,6 +19,9 @@ DB_CONFIG = {
 
 
 
+
+
+
 #Logging config
 os.makedirs("./logs", exist_ok=True)
 
@@ -38,7 +41,7 @@ console_handler.setFormatter(colorlog.ColoredFormatter(
 
 
 file_handler = TimedRotatingFileHandler(
-    "./logs/CommunityPlaylistWeb.log",
+    "./logs/lord_trivia.log",
     when="midnight",
     interval=1,
     backupCount=7,
