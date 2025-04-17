@@ -2,7 +2,7 @@ import discord
 from config import DISCORD_TOKEN
 import db
 import logging
-from models import Question
+import models
 
 
 intents = discord.Intents.default()
@@ -43,5 +43,11 @@ async def register(interaction: discord.Interaction):
         await interaction.response.send_message("There was an error registering you for trivia")
 
     await interaction.response.send_message("You've been registered for trivia!")
+
+
+@tree.command(name="play", description="Play some Trivia!")
+async def play(interaction: discord.Interaction):
+    question = db.get_random_question()
+    await interaction.response.send_message(question.prompt)
 
 client.run(DISCORD_TOKEN)

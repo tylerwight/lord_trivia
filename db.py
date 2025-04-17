@@ -162,16 +162,17 @@ def add_question(question: models.Question):
         cursor.close()
         conn.close()
 
+
 def get_question(question_id: int) -> models.Question | None:
     conn = get_connection()
     if not conn:
-        logging.info("DB.GETQUESTION: unable to connect to DB")
+        logging.error("DB.GETQUESTION: unable to connect to DB")
         return None
     
     cursor = conn.cursor()
     try:
         query = "SELECT prompt, answers, correct_index FROM questions WHERE id = %s"
-        cursor.execute(query, (question_id))
+        cursor.execute(query, (question_id,))
         row = cursor.fetchone()
         if row:
             return models.Question(prompt=row[0], answers=json.loads(row[1]), correct_index=row[2])
@@ -184,6 +185,40 @@ def get_question(question_id: int) -> models.Question | None:
     finally:
         cursor.close()
         conn.close()
+
+def get_random_question() -> models.Question | None:
+    conn = get_connection()
+    if not conn:
+        logging.warning("DB.GET_RANDOM_QUESTION: Unable to connect to DB.")
+        return None
+
+    cursor = conn.cursor()
+    try:
+        query = """
+            SELECT prompt, answers, correct_index
+            FROM questions
+            WHERE enabled = TRUE
+            ORDER BY RAND()
+            LIMIT 1
+        """
+        cursor.execute(query)
+        row = cursor.fetchone()
+        if row:
+            return models.Question(
+                prompt=row[0],
+                answers=json.loads(row[1]),
+                correct_index=row[2]
+            )
+        else:
+            logging.info("DB.GET_RANDOM_QUESTION: No enabled questions found.")
+            return None
+    except Error as e:
+        logging.error(f"DB.GET_RANDOM_QUESTION: Error retrieving question: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
 
 #create database "lord_trivia"
 #CREATE TABLE user_data (id INT AUTO_INCREMENT PRIMARY KEY, guild_id BIGINT NOT NULL, user_id BIGINT NOT NULL, points BIGINT DEFAULT 0, streak INT DEFAULT 0, answers_total INT DEFAULT 0, answers_correct INT DEFAULT 0, gambling_winnings BIGINT DEFAULT 0, gambling_losses BIGINT DEFAULT 0);
@@ -208,3 +243,10 @@ def get_question(question_id: int) -> models.Question | None:
 # row = cursor.fetchone()
 # q = Question(prompt=row[0], answers=json.loads(row[1]), correct_index=row[2])
 
+# if __name__ == "__main__":
+#     q1 = models.Question(
+#         prompt="What is 2 + 2?",
+#         answers=["3", "4", "5", "6"],
+#         correct_index=1
+#     )
+#     add_question(q1)
