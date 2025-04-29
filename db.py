@@ -179,11 +179,11 @@ def get_question(question_id: int) -> models.Question | None:
     
     cursor = conn.cursor()
     try:
-        query = "SELECT prompt, answers, correct_index FROM questions WHERE id = %s"
+        query = "SELECT prompt, answers, correct_index, category, difficulty FROM questions WHERE id = %s"
         cursor.execute(query, (question_id,))
         row = cursor.fetchone()
         if row:
-            return models.Question(prompt=row[0], answers=json.loads(row[1]), correct_index=row[2])
+            return models.Question(prompt=row[0], answers=json.loads(row[1]), correct_index=row[2], category=row[3], difficulty=row[4])
         else:
             logging.info(f"DB.GETQUESTION: No question found with id {question_id}")
             return None
@@ -203,7 +203,7 @@ def get_random_question() -> models.Question | None:
     cursor = conn.cursor()
     try:
         query = """
-            SELECT prompt, answers, correct_index
+            SELECT prompt, answers, correct_index, category, difficulty
             FROM questions
             WHERE enabled = TRUE
             ORDER BY RAND()
@@ -215,7 +215,9 @@ def get_random_question() -> models.Question | None:
             return models.Question(
                 prompt=row[0],
                 answers=json.loads(row[1]),
-                correct_index=row[2]
+                correct_index=row[2],
+                category=row[3],
+                difficulty=row[4]
             )
         else:
             logging.info("DB.GET_RANDOM_QUESTION: No enabled questions found.")

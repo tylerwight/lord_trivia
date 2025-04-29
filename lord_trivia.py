@@ -3,12 +3,74 @@ from config import DISCORD_TOKEN
 import db
 import logging
 import models
+import string
+import asyncio
 
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
 
 tree = discord.app_commands.CommandTree(client)
+
+
+class AnswerButtons(discord.ui.View):
+    def __init__(self, question: models.Question, timeout=30):
+        super().__init__(timeout=timeout)
+        self.question = question
+        self.response = None
+        self.message: discord.Message | None = None  
+
+        # Create buttons based on the number of answers
+        option_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+        for i, _ in enumerate(self.question.answers):
+            if i >= len(option_letters):
+                break
+            label = option_letters[i]
+            self.add_item(AnswerButton(label=label, index=i))
+    
+    async def on_timeout(self):
+        logging.info("Trivia timed out!")
+        self.clear_items()
+        await self.message.edit(content="Your game session has ended", view=self)
+
+
+class AnswerButton(discord.ui.Button):
+    def __init__(self, label: str, index: int):
+        super().__init__(style=discord.ButtonStyle.primary, label=label)
+        self.index = index
+
+    async def callback(self, interaction: discord.Interaction):
+        question: models.Question = self.view.question
+        is_correct = (self.index == question.correct_index)
+
+        # Disable all buttons after answer
+        for item in self.view.children:
+            item.disabled = True
+
+        if is_correct:
+            await interaction.response.edit_message(content="✅ Correct!", view=self.view)
+        else:
+            correct_letter = ['A', 'B', 'C', 'D', 'E', 'F', 'G'][question.correct_index]
+            await interaction.response.edit_message(
+                content=f"❌ Wrong! Correct answer was **{correct_letter}**.",
+                view=self.view
+            )
+
+        await asyncio.sleep(5)
+
+        new_question = db.get_random_question()
+        letters = string.ascii_uppercase
+        answer_lines = "\n".join(
+            f"{letters[i]}: {answer}"
+            for i, answer in enumerate(new_question.answers)
+        )
+        content = f"{new_question.prompt}\n{answer_lines}"
+
+        await interaction.edit_original_response(content=content, view=AnswerButtons(new_question))
+
+
+
+
 
 @client.event
 async def on_ready():
@@ -48,34 +110,16 @@ async def register(interaction: discord.Interaction):
 @tree.command(name="play", description="Play some Trivia!")
 async def play(interaction: discord.Interaction):
     question = db.get_random_question()
-    await interaction.response.send_message(question.prompt)
-
-@tree.context_menu(name='Report to Moderators')
-async def report_message(interaction: discord.Interaction, message: discord.Message):
-    # We're sending this response message with ephemeral=True, so only the command executor can see it
-    await interaction.response.send_message(
-        f'Thanks for reporting this message by {message.author.mention} to our moderators.', ephemeral=True
+    letters = string.ascii_uppercase
+    answer_lines = "\n".join(
+        f"{letters[i]}: {answer}"
+        for i, answer in enumerate(question.answers)
     )
+    content = f"{question.prompt}\n{answer_lines}"
+    view=AnswerButtons(question)
+    await interaction.response.send_message(content, view=view)
+    view.message = await interaction.original_response()  
+    
 
-    # Handle report by sending it into a log channel
-    log_channel = interaction.guild.get_channel(534427957452603402)  # replace with your channel id
-
-    embed = discord.Embed(title='Reported Message')
-    if message.content:
-        embed.description = message.content
-
-    embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
-    embed.timestamp = message.created_at
-
-    url_view = discord.ui.View()
-    url_view.add_item(discord.ui.Button(label='Go to Message', style=discord.ButtonStyle.url, url=message.jump_url))
-
-    await log_channel.send(embed=embed, view=url_view)
-
-# This context menu command only works on members
-@tree.context_menu(name='Show Join Date')
-async def show_join_date(interaction: discord.Interaction, member: discord.Member):
-    # The format_dt function formats the date time into a human readable representation in the official client
-    await interaction.response.send_message(f'{member} joined at {discord.utils.format_dt(member.joined_at)}')
 
 client.run(DISCORD_TOKEN)
