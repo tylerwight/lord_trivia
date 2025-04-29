@@ -65,8 +65,10 @@ class AnswerButton(discord.ui.Button):
             for i, answer in enumerate(new_question.answers)
         )
         content = f"{new_question.prompt}\n{answer_lines}"
-
-        await interaction.edit_original_response(content=content, view=AnswerButtons(new_question))
+        self.view.question = new_question
+        for item in self.view.children:
+            item.disabled = False
+        await interaction.edit_original_response(content=content, view=self.view)
 
 
 
