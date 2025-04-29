@@ -43,10 +43,16 @@ def initialize():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS questions (
                 id INT AUTO_INCREMENT PRIMARY KEY,
-                prompt VARCHAR(1024),
+                prompt VARCHAR(768)
+                       CHARACTER SET utf8mb4
+                       COLLATE utf8mb4_0900_ai_ci
+                       NOT NULL,
                 answers JSON,
                 correct_index INT,
-                enabled BOOLEAN NOT NULL DEFAULT TRUE
+                enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                difficulty VARCHAR(100),
+                category VARCHAR(256),
+                UNIQUE KEY uq_prompt (prompt)
             );
         """)
 
@@ -143,21 +149,23 @@ def get_user(guild_id: int, user_id: int) -> models.User | None:
 ####QUESTIONS####
 #################
 
-def add_question(question: models.Question):
+def add_question(question: models.Question) -> bool:
     conn = get_connection()
     if not conn:
         logging.info("Unable to connect to database.")
-        return
+        return False
 
     cursor = conn.cursor()
     try:
-        query = "INSERT INTO questions (prompt, answers, correct_index) VALUES (%s, %s, %s)"
-        cursor.execute(query, (question.prompt, json.dumps(question.answers), question.correct_index))
+        query = "INSERT INTO questions (prompt, answers, correct_index, difficulty, category) VALUES (%s, %s, %s, %s, %s)"
+        cursor.execute(query, (question.prompt, json.dumps(question.answers), question.correct_index, question.difficulty, question.category))
         conn.commit()
         logging.info(f"DB.ADDQUESTION: Question added to table Questions: {question.prompt}.")
+        return True
 
     except Error as e:
         logging.error(f"Error adding question: {e}")
+        return False
     finally:
         cursor.close()
         conn.close()

@@ -6,6 +6,8 @@ class Question:
     prompt: str
     answers: List[str]
     correct_index: int
+    difficulty: str
+    category: str
 
     def is_correct(self, user_choice: str) -> bool:
         # Normalize input and map letters to indices
