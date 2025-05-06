@@ -145,6 +145,45 @@ def get_user(guild_id: int, user_id: int) -> models.User | None:
         conn.close()
 
 
+def update_user(user: models.User) -> bool:
+    conn = get_connection()
+    if not conn:
+        logging.info("DB.UPDATEUSER: unable to connect to DB")
+        return False
+
+    cursor = conn.cursor()
+    try:
+        query = """
+            UPDATE user_data
+            SET points = %s,
+                streak = %s,
+                answers_total = %s,
+                answers_correct = %s,
+                gambling_winnings = %s,
+                gambling_losses = %s
+            WHERE guild_id = %s AND user_id = %s
+        """
+        cursor.execute(query, (
+            user.points,
+            user.streak,
+            user.answers_total,
+            user.answers_correct,
+            user.gambling_winnings,
+            user.gambling_losses,
+            user.guild_id,
+            user.user_id
+        ))
+        conn.commit()
+        logging.info(f"DB.UPDATEUSER: Updated user {user.user_id} in guild {user.guild_id}.")
+        return True
+    except Error as e:
+        logging.error(f"DB.UPDATEUSER: Error updating user: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+
 #################
 ####QUESTIONS####
 #################
