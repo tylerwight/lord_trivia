@@ -7,6 +7,7 @@ import string
 import asyncio
 import ui
 from mp_game_loop import mp_trivia_loop
+from gmb_game_loop import gmb_game_loop
 
 
 intents = discord.Intents.default()
@@ -84,15 +85,34 @@ async def playmp(interaction: discord.Interaction):
 @tree.command(name="mystats", description="Show your stats")
 async def mystats(interaction: discord.Interaction):
     if interaction.guild_id is None:
-        await interaction.response.send_message("This command can only be used in a server.")
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
         return
+    if not db.user_exists(interaction.guild_id, interaction.user.id):
+        await interaction.response.send_message("You aren't registered, please use the /register command!", ephemeral=True)
+        return
+
+    user = db.get_user(interaction.guild_id, interaction.user.id)
+
+    embed = discord.Embed(
+        title=f"📊 Stats for {interaction.user.display_name}",
+        color=discord.Color.gold()
+    )
+    embed.set_thumbnail(url=interaction.user.display_avatar.url)
+    embed.add_field(name="🏅 Points", value=str(user.points), inline=True)
+    embed.add_field(name="🔥 Streak", value=str(user.streak), inline=True)
+    embed.add_field(name="❓ Questions Answered", value=str(user.answers_total), inline=False)
+    embed.add_field(name="✅ Correct Answers", value=str(user.answers_correct), inline=True)
+    embed.add_field(name="💰 Winnings", value=str(user.gambling_winnings), inline=True)
+    embed.add_field(name="💸 Losses", value=str(user.gambling_losses), inline=True)
+
+    await interaction.response.send_message(embed=embed)
+
+@tree.command(name="gamble", description="Gamble your points for chance to win big!")
+async def gamble(interaction: discord.Interaction):
     if not db.user_exists(interaction.guild_id, interaction.user.id):
         await interaction.response.send_message("You aren't registered, please use the /register command!")
         return
     
-
-    user = db.get_user(interaction.guild_id, interaction.user.id)
-    content = f"username: {interaction.user.name}\nPoints: {user.points}\n Streak: {user.streak}\n Total Q's Answered: {user.answers_total}\n Correct Q's: {user.answers_correct}\nWinnings: {user.gambling_winnings}\n Losses: {user.gambling_losses}"
-    await interaction.response.send_message(content)
+    asyncio.create_task(gmb_game_loop(interaction))
 
 client.run(DISCORD_TOKEN)
