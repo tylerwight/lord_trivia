@@ -5,15 +5,16 @@ import logging
 import models
 import string
 import asyncio
-import ui
-from mp_game_loop import mp_trivia_loop
-from gmb_game_loop import gmb_game_loop
+import mp_game
+import gmb_game
+import sp_game
+from submit_question import submit_question_loop
 
 
 intents = discord.Intents.default()
+intents.message_content = True
 client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)
-
 
 @client.event
 async def on_ready():
@@ -68,7 +69,7 @@ async def playsp(interaction: discord.Interaction):
         for i, answer in enumerate(question.answers)
     )
     content = f"{question.prompt}\n{answer_lines}"
-    view=ui.SPButtonContainer(question)
+    view=sp_game.SPButtonContainer(question)
     await interaction.response.send_message(content, view=view)
     view.message = await interaction.original_response()  
 
@@ -79,7 +80,7 @@ async def playmp(interaction: discord.Interaction):
         await interaction.response.send_message("You aren't registered, please use the /register command!")
         return
 
-    asyncio.create_task(mp_trivia_loop(interaction))
+    asyncio.create_task(mp_game.mp_trivia_loop(interaction))
 
 
 @tree.command(name="mystats", description="Show your stats")
@@ -113,6 +114,14 @@ async def gamble(interaction: discord.Interaction):
         await interaction.response.send_message("You aren't registered, please use the /register command!")
         return
     
-    asyncio.create_task(gmb_game_loop(interaction))
+    asyncio.create_task(gmb_game.gmb_game_loop(interaction))
+
+@tree.command(name="submit_question", description="Gamble your points for chance to win big!")
+async def submit_question(interaction: discord.Interaction):
+    if not db.user_exists(interaction.guild_id, interaction.user.id):
+        await interaction.response.send_message("You aren't registered, please use the /register command!")
+        return
+    
+    asyncio.create_task(submit_question_loop(interaction, client))
 
 client.run(DISCORD_TOKEN)

@@ -2,13 +2,17 @@ import discord
 import db
 import string
 import asyncio
-import ui
 import time
+import logging
+import models
+import random
+
 
 async def mp_trivia_loop(interaction: discord.Interaction, rounds: int = 3):
     tmpq = db.get_random_question()
-    view = ui.MPButtonContainer(tmpq)
+    view = MPButtonContainer(tmpq)
     sleeptime = 15
+
     for round in range(rounds):
         question = db.get_random_question()
         view.question = question
@@ -22,9 +26,9 @@ async def mp_trivia_loop(interaction: discord.Interaction, rounds: int = 3):
             description=question.prompt,
             color=discord.Color.blurple()
         )
-        
+
         for i, answer in enumerate(question.answers):
-            embed.add_field(name=f":regional_indicator_{letters[i].lower()}: :", value=answer, inline=False)
+            embed.add_field(name=f":regional_indicator_{letters[i].lower()}: :", value=answer, inline=True)
 
         current_time_unix = int(time.time())
         embed.add_field(name=f"Time Left", value = f"<t:{current_time_unix + sleeptime}:R>", inline=False)
@@ -82,3 +86,51 @@ async def mp_trivia_loop(interaction: discord.Interaction, rounds: int = 3):
         )
     else:
         await interaction.channel.send("🏁 Trivia session ended!\n No one participated. 😢")
+
+
+
+class MPButtonContainer(discord.ui.View):
+    def __init__(self, question: models.Question, timeout=30):
+        super().__init__(timeout=timeout)
+        self.question = question
+        self.user_answers = {}  # key: user_id, value: index
+        self.user_totals = {}
+        self.message: discord.Message | None = None
+        self.rounds = 3
+
+        option_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+        for i, _ in enumerate(self.question.answers):
+            if i >= len(option_letters):
+                break
+            self.add_item(MPAnswerButton(label=option_letters[i], index=i))
+
+    def repopulate_buttons(self):
+        self.clear_items()
+        option_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
+        for i, _ in enumerate(self.question.answers):
+            if i >= len(option_letters):
+                break
+            self.add_item(MPAnswerButton(label=option_letters[i], index=i))
+
+    async def on_timeout(self):
+        self.clear_items()
+        await self.message.edit(content="Trivia ended due to inactivity.", view=self)
+
+
+
+class MPAnswerButton(discord.ui.Button):
+    def __init__(self, label: str, index: int):
+        super().__init__(style=discord.ButtonStyle.primary, label=label)
+        self.index = index
+
+    async def callback(self, interaction: discord.Interaction):
+        view: MPButtonContainer = self.view
+        user_id = interaction.user.id
+
+        if user_id in view.user_answers:
+            await interaction.response.send_message("You already answered!", ephemeral=True)
+            return
+
+        view.user_answers[user_id] = self.index
+
+        await interaction.response.defer(thinking=False)
