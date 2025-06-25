@@ -343,6 +343,7 @@ class PigRollButton(discord.ui.Button):
         game.pot += game.ante
 
         desc, pts, flag = score_roll()
+        embed = pig_build_embed(game, interaction.guild)
 
         if flag == "pigout":
             game.turn_score = 0
@@ -361,7 +362,7 @@ class PigRollButton(discord.ui.Button):
                 f"Pot: **{game.pot}** – (*Bank* to cash-in)"
             )
 
-        await interaction.response.edit_message(content=txt, view=self.view)
+        await interaction.response.edit_message(embed=embed, content=txt, view=self.view)
 
 class PigBankButton(discord.ui.Button):
     def __init__(self, label): super().__init__(label=label, style=discord.ButtonStyle.success)
@@ -410,10 +411,10 @@ class PigBankButton(discord.ui.Button):
 
 class PigLobbyView(discord.ui.View):
     def __init__(self, game: PigGameState):
-        super().__init__(timeout=60)
+        super().__init__(timeout=15)
         self.game = game
         self.add_item(PigJoinButton())
-        self.starttime = int(time.time()) + 60
+        self.starttime = int(time.time()) + self.timeout
 
     async def on_timeout(self):
         """Called automatically after 60 s."""
@@ -475,6 +476,7 @@ class PigJoinButton(discord.ui.Button):
 
         # Register player
         game.turn_order.append(uid)
+        self.view.starttime = int(time.time()) + self.view.timeout
         await interaction.response.send_message(
             f"✅ {interaction.user.display_name} joined the game!",
             ephemeral=True
@@ -495,3 +497,64 @@ class PigJoinButton(discord.ui.Button):
             view=self.view
         )
         
+
+
+# def pig_build_embed(game: PigGameState, interaction: discord.Interaction):
+#     embed = discord.Embed(
+#         title=f"🐷 PASS THE PIGS 🐷",
+#         color=discord.Color.pink()
+#     )
+#     for user_id in game.turn_order:
+#         embed.add_field(name=f"{interaction.guild.get_member(user_id).mention}'s Points", value=game.scores[user_id], inline = True)
+
+#     embed.add_field(name=f"current player:", value=f"{interaction.guild.get_member(game.current).mention}", inline=True)
+#     embed.add_field(name="Total points: ", value=game.scores[game.current], inline=True)
+#     embed.add_field(name="Current turn points:", value=game.turn_score, inline=True)
+
+#     return embed
+
+def pig_build_embed(game: PigGameState, guild: discord.Guild) -> discord.Embed:
+    """
+    Creates an embed that lists *all* players' banked totals, then highlights
+    the active player, their un-banked turn score, and the pot.
+    """
+    # Build a score table in the description so it auto-wraps nicely
+    lines = []
+    for uid in game.turn_order:
+        member = guild.get_member(uid)
+        name = member.display_name if member else f"User {uid}"
+        score = game.scores.get(uid, 0)           # default 0 if not yet scored
+        lines.append(f"**{name}:** {score} pts")
+
+    desc = "\n".join(lines)
+
+    embed = discord.Embed(
+        title="🐷 PASS THE PIGS 🐷",
+        description=desc,
+        color=discord.Color.pink()
+    )
+
+    # Current-turn details (inline=False puts each on its own line)
+    current = guild.get_member(game.current)
+    embed.add_field(
+        name="▶️ Current Player",
+        value=current.mention if current else f"<@{game.current}>",
+        inline=False,
+    )
+    embed.add_field(
+        name="Un-banked Turn Points",
+        value=str(game.turn_score),
+        inline=True,
+    )
+    embed.add_field(
+        name="Banked Total",
+        value=str(game.scores.get(game.current, 0)),
+        inline=True,
+    )
+    embed.add_field(
+        name="Pot",
+        value=str(game.pot),
+        inline=True,
+    )
+
+    return embed
