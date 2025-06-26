@@ -24,7 +24,7 @@ class WagerSelectView(discord.ui.View):
     def __init__(self, game='coinflip'):
         super().__init__(timeout=120)
         self.game = game
-        for amount in [5, 10, 25, 100, 500 , 1000, 10000]:
+        for amount in [1, 5, 10, 25, 100, 500 , 1000, 10000]:
             self.add_item(WagerButton(amount))
 
     async def on_timeout(self):
@@ -237,10 +237,10 @@ def score_roll():
     # --- 2) Exactly one pig on its side ------------------------------
     if side1 ^ side2:                           # xor: only one side-pig
         if side1:
-            desc = f"{n2} (other pig on side) → **{p2}** pts"
+            desc = f"{n2} → **{p2}** pts"
             return desc, p2, None
         else:
-            desc = f"{n1} (other pig on side) → **{p1}** pts"
+            desc = f"{n1} → **{p1}** pts"
             return desc, p1, None
 
     # --- 3) Neither pig on its side ----------------------------------
@@ -252,7 +252,7 @@ def score_roll():
         score = p1 + p2
         return f"{n1} + {n2} → **{score}** pts", score, None
 
-class PigGameState:                           # ▲ NEW
+class PigGameState:                       
     def __init__(self, ante: int):
         self.ante = ante          # cost every time you click Roll
         self.pot = 0
@@ -262,6 +262,8 @@ class PigGameState:                           # ▲ NEW
         self.turn_iter: itertools.cycle | None = None
         self.current: int | None = None
         self.message: discord.Message | None = None
+        self.turn_outcome_text = ""
+        self.title = "Pass the Pigs!"
 
     # rotation helper
     def next_player(self) -> int:
@@ -343,7 +345,7 @@ class PigRollButton(discord.ui.Button):
         game.pot += game.ante
 
         desc, pts, flag = score_roll()
-        embed = pig_build_embed(game, interaction.guild)
+        
 
         if flag == "pigout":
             game.turn_score = 0
@@ -362,6 +364,7 @@ class PigRollButton(discord.ui.Button):
                 f"Pot: **{game.pot}** – (*Bank* to cash-in)"
             )
 
+        embed = pig_build_embed(game, interaction.guild)
         await interaction.response.edit_message(embed=embed, content=txt, view=self.view)
 
 class PigBankButton(discord.ui.Button):
@@ -529,7 +532,7 @@ def pig_build_embed(game: PigGameState, guild: discord.Guild) -> discord.Embed:
     desc = "\n".join(lines)
 
     embed = discord.Embed(
-        title="🐷 PASS THE PIGS 🐷",
+        title=game.title,
         description=desc,
         color=discord.Color.pink()
     )
@@ -554,6 +557,11 @@ def pig_build_embed(game: PigGameState, guild: discord.Guild) -> discord.Embed:
     embed.add_field(
         name="Pot",
         value=str(game.pot),
+        inline=True,
+    )
+    embed.add_field(
+        name=game.turn_outcome_text,
+        value="",
         inline=True,
     )
 
